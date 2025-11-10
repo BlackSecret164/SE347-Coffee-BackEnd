@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    container_name: doan2cafe_api
+    ports:
+      - "3000:3000"
+    env_file:
+      - local.env
+    networks:
+      - doan2cafe_net
+
+networks:
+  doan2cafe_net:
