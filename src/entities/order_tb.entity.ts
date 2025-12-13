@@ -44,6 +44,12 @@ export class Order {
   @Column({ name: 'status', length: 20 })
   status: string;
 
+  @Column({ name: 'paymentmethod', length: 100 })
+  paymentMethod: string;
+
+  @Column({ name: 'paymentstatus', length: 100 })
+  paymentStatus: string;
+
   @OneToMany(() => OrderDetails, (detail) => detail.order)
   details: OrderDetails[];
 

@@ -67,6 +67,14 @@ export class UpdateOrderDto {
   @ApiProperty()
   @IsString()
   status: string;
+
+  @ApiProperty()
+  @IsString()
+  paymentMethod: string;
+
+  @ApiProperty()
+  @IsString()
+  paymentStatus: string;
 }
 
 export class CreateOrderCustomerDto {
@@ -116,6 +124,14 @@ export class UpdateOrderCustomerDto {
   @ApiProperty()
   @IsString()
   status: string;
+
+  @ApiProperty()
+  @IsString()
+  paymentMethod: string;
+
+  @ApiProperty()
+  @IsString()
+  paymentStatus: string;
 }
 
 export enum OrderStatus {

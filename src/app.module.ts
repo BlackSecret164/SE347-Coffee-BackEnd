@@ -19,6 +19,7 @@ import { BranchOrderModule } from './modules/branch_order.module';
 import { RatingModule } from './modules/rating.module';
 import { BranchMaterialModule } from './modules/branch_material.module';
 import { CartModule } from './modules/cart.module';
+import { VnpayModule } from './modules/vnpay.module';
 import typeorm from './commons/TypeORMConfig';
 import { envFiles } from './commons/Constant';
 // import thêm các entity khác ở đây
@@ -52,6 +53,7 @@ import { envFiles } from './commons/Constant';
     PromoteModule,
     MembershipModule,
     ReportModule,
+    VnpayModule,
   ],
 })
 export class AppModule {}
