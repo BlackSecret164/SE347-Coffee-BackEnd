@@ -120,27 +120,39 @@ export class ProductService {
     }));
   }
 
-  async findProductsByBranch(branchId: number) {
-    // Tìm các sản phẩm có sẵn trong chi nhánh
-    const productBranches = await this.productBranchRepo.find({
-      where: {
-        branchId: branchId,
-        available: true, // Sản phẩm phải có sẵn tại chi nhánh
-      },
-      relations: {
-        product: {
-          sizes: true,
-          productMaterials: {
-            rawMaterial: true,
+  async filterProducts(filterDto: { branchId?: number; category?: string }) {
+    const { branchId, category } = filterDto;
+
+    // Nếu có branchId, lọc theo chi nhánh
+    if (branchId) {
+      const productBranches = await this.productBranchRepo.find({
+        where: {
+          branchId: branchId,
+          available: true,
+        },
+        relations: {
+          product: {
+            sizes: true,
+            productMaterials: {
+              rawMaterial: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Lọc và chỉ trả về những sản phẩm cũng có available = true ở bảng product
-    const availableProducts = productBranches
-      .filter((pb) => pb.product.available === true)
-      .map((pb) => {
+      // Lọc sản phẩm có available = true ở bảng product
+      let availableProducts = productBranches.filter(
+        (pb) => pb.product.available === true
+      );
+
+      // Nếu có category, lọc thêm theo category
+      if (category) {
+        availableProducts = availableProducts.filter(
+          (pb) => pb.product.category === category
+        );
+      }
+
+      return availableProducts.map((pb) => {
         const product = pb.product;
         return {
           id: product.id.toString(),
@@ -169,8 +181,54 @@ export class ProductService {
           })),
         };
       });
+    }
 
-    return availableProducts;
+    // Nếu không có branchId nhưng có category, lọc theo category từ tất cả sản phẩm
+    if (category) {
+      const products = await this.productRepo.find({
+        where: {
+          category: category,
+          available: true,
+        },
+        relations: {
+          sizes: true,
+          productMaterials: {
+            rawMaterial: true,
+          },
+        },
+        order: { id: 'ASC' },
+      });
+
+      return products.map((product) => ({
+        id: product.id.toString(),
+        name: product.name,
+        category: product.category,
+        description: product.description,
+        image: product.image,
+        available: product.available,
+        hot: product.hot,
+        cold: product.cold,
+        isPopular: product.isPopular,
+        isNew: product.isNew,
+        sizes: product.sizes
+          .sort((a, b) => {
+            const order = { 'S': 1, 'M': 2, 'L': 3 };
+            return order[a.sizeName] - order[b.sizeName];
+          })
+          .map((s) => ({
+            sizeName: s.sizeName,
+            price: s.price,
+          })),
+        materials: product.productMaterials.map((pm) => ({
+          materialId: pm.materialId,
+          materialQuantity: pm.materialQuantity,
+          name: pm.rawMaterial.name,
+        })),
+      }));
+    }
+
+    // Nếu không có filter nào, trả về tất cả sản phẩm có sẵn
+    return this.findAll();
   }
 
   async create(createDto: CreateProductDto) {

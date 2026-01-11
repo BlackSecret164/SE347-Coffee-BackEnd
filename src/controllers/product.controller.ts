@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Put, Param, Body, Delete, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, Delete, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { ProductService } from '../services/product.service';
-import { CreateProductDto, UpdateStatusDto } from '../dtos/product.dto';
+import { CreateProductDto, UpdateStatusDto, FilterProductDto } from '../dtos/product.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/RoleGuard';
@@ -21,10 +21,10 @@ export class ProductController {
     return this.productService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get product by ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.productService.findOne(id);
+  @Get('/filter')
+  @ApiOperation({ summary: 'Filter products by branch and/or category' })
+  filterProducts(@Query() filterDto: FilterProductDto) {
+    return this.productService.filterProducts(filterDto);
   }
 
   @Get('/available-branches/:productId')
@@ -33,10 +33,10 @@ export class ProductController {
     return this.productService.findBranchesByProduct(productId);
   }
 
-  @Get('/filterbranch/:branchId')
-  @ApiOperation({ summary: 'Get available products by branch ID' })
-  findProductsByBranch(@Param('branchId', ParseIntPipe) branchId: number) {
-    return this.productService.findProductsByBranch(branchId);
+  @Get(':id')
+  @ApiOperation({ summary: 'Get product by ID' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.productService.findOne(id);
   }
 
   @Post()

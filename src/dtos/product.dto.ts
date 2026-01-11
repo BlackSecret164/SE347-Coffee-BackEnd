@@ -44,6 +44,18 @@ export class CreateProductDto {
   productMaterials?: ProductMaterialInputDto[];
 }
 
+export class FilterProductDto {
+  @ApiProperty({ required: false, description: 'Filter by branch ID' })
+  @IsOptional()
+  @Type(() => Number)
+  branchId?: number;
+
+  @ApiProperty({ required: false, description: 'Filter by category' })
+  @IsOptional()
+  @IsString()
+  category?: string;
+}
+
 export class UpdateStatusDto{
   @ApiProperty()
   @IsBoolean()
