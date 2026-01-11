@@ -28,8 +28,15 @@ export class ProductController {
   }
 
   @Get('/available-branches/:productId')
+  @ApiOperation({ summary: 'Get available branches by product ID' })
   findBranches(@Param('productId', ParseIntPipe) productId: number) {
     return this.productService.findBranchesByProduct(productId);
+  }
+
+  @Get('/filterbranch/:branchId')
+  @ApiOperation({ summary: 'Get available products by branch ID' })
+  findProductsByBranch(@Param('branchId', ParseIntPipe) branchId: number) {
+    return this.productService.findProductsByBranch(branchId);
   }
 
   @Post()
