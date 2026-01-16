@@ -101,12 +101,21 @@ export class BranchOrderController {
     }
 
     @Put('status/:id')
+    @ApiOperation({ summary: 'Update order status and assign staff' })
+    @Role([EnumRoles.ADMIN_BRAND, EnumRoles.STAFF])
     async updateStatus(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateOrderStatusDto,
         @Req() req: any,
     ) {
-        const branchId = req.user.branchId; // Lấy từ JWT
-        return this.branchOrderService.updateStatus(id, dto.status, branchId);
+        const branchId = req.user.branchId;
+        // Truyền cả staffId và staffName vào service (uưu tiên staffId)
+        return this.branchOrderService.updateStatus(
+            id, 
+            dto.status, 
+            branchId, 
+            dto.staffId, 
+            dto.staffName
+        );
     }
 }

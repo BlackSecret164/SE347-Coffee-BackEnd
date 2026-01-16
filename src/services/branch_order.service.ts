@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from 'src/entities/order_tb.entity';
@@ -8,6 +8,7 @@ import { CreateOrderDetailsDto } from 'src/dtos/order-details.dto';
 import { ProductSize } from 'src/entities/product_size.entity';
 import { ProductBranch } from '../entities/product_branch.entity';
 import { OrderStatus } from 'src/dtos/order.dto';
+import { Staff } from '../entities/staff.entity';
 
 @Injectable()
 export class BranchOrderService {
@@ -24,6 +25,10 @@ export class BranchOrderService {
     private readonly productBranchRepo: Repository<ProductBranch>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+
+    // Thêm Staff Repository để tìm nhân viên theo tên
+    @InjectRepository(Staff)
+    private readonly staffRepo: Repository<Staff>,
 
   ) { }
 
@@ -139,13 +144,96 @@ export class BranchOrderService {
     return { message: 'Order marked as cancelled' };
   }
 
-  // branch-order.service.ts
-  async updateStatus(orderId: number, newStatus: OrderStatus, branchId: number) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId, branch: { id: branchId } } });
-    if (!order) throw new NotFoundException('Order not found in your branch');
+  /**
+   * Cập nhật trạng thái đơn hàng và gán nhân viên
+   * Logic: Chệ bắt buộc nhập staffId hoặc staffName khi đơn ở "Chờ xác nhận" chuyển sang trạng thái khác VÀ chưa có nhân viên
+   * @param staffId - ID nhân viên (uưu tiên nếu có)
+   * @param staffName - Tên nhân viên (dùng nếu không có staffId)
+   */
+  async updateStatus(
+    orderId: number, 
+    newStatus: OrderStatus, 
+    branchId: number, 
+    staffId?: number,
+    staffName?: string
+  ) {
+    // Lấy order với relation staff để kiểm tra
+    const order = await this.orderRepo.findOne({ 
+      where: { id: orderId, branch: { id: branchId } },
+      relations: ['staff', 'branch']
+    });
+    
+    if (!order) {
+      throw new NotFoundException('Order not found in your branch');
+    }
 
+    // Kiểm tra: Nếu đơn đang ở "Chờ xác nhận" và chuyển sang trạng thái khác
+    const isLeavingPending = order.status === OrderStatus.PENDING && newStatus !== OrderStatus.PENDING;
+    
+    // Nếu đang chuyển từ "Chờ xác nhận" VÀ chưa có nhân viên VÀ không có staffId/staffName
+    if (isLeavingPending && !order.staffID && !staffId && !staffName) {
+      throw new BadRequestException(
+        'Vui lòng chỉ định nhân viên xử lý đơn hàng khi xác nhận (staffId hoặc staffName)'
+      );
+    }
+
+    // Cập nhật trạng thái
     order.status = newStatus;
-    return this.orderRepo.save(order);
+
+    let assignedStaffName: string | null = null;
+
+    // Logic gán nhân viên: Uưu tiên staffId, nếu không có thì dùng staffName
+    if (staffId) {
+      // Cách 1: Dùng staffId (nhanh và chính xác)
+      const staff = await this.staffRepo.findOne({ 
+        where: { 
+          id: staffId,
+          branch: { id: branchId }
+        } 
+      });
+      
+      if (!staff) {
+        throw new NotFoundException(
+          `Không tìm thấy nhân viên với ID ${staffId} trong chi nhánh`
+        );
+      }
+      
+      // Gán nhân viên cho đơn hàng
+      order.staffID = staff.id;
+      order.staff = staff;
+      assignedStaffName = staff.name;
+      
+    } else if (staffName) {
+      // Cách 2: Dùng staffName (tìm theo tên, trim và case-insensitive)
+      const trimmedName = staffName.trim();
+      
+      // Sử dụng query builder để search case-insensitive và trim
+      const staff = await this.staffRepo
+        .createQueryBuilder('staff')
+        .where('LOWER(TRIM(staff.name)) = LOWER(:name)', { name: trimmedName })
+        .andWhere('staff.branchId = :branchId', { branchId })
+        .getOne();
+      
+      if (!staff) {
+        throw new NotFoundException(
+          `Không tìm thấy nhân viên "${trimmedName}" trong chi nhánh`
+        );
+      }
+      
+      // Gán nhân viên cho đơn hàng
+      order.staffID = staff.id;
+      order.staff = staff;
+      assignedStaffName = staff.name.trim();
+    }
+
+    const savedOrder = await this.orderRepo.save(order);
+    
+    return {
+      ...savedOrder,
+      message: assignedStaffName
+        ? `Đã cập nhật trạng thái thành "${newStatus}" và gán cho nhân viên "${assignedStaffName}" (ID: ${savedOrder.staffID})`
+        : `Đã cập nhật trạng thái thành "${newStatus}"`
+    };
   }
 
   async addDetailInBranch(orderID: number, dto: CreateOrderDetailsDto, branchId: number) {

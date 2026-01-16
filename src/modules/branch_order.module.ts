@@ -6,9 +6,10 @@ import { Order } from '../entities/order_tb.entity';
 import { OrderDetails } from '../entities/order-details.entity';
 import { ProductSize } from 'src/entities/product_size.entity';
 import { ProductBranch } from '../entities/product_branch.entity';
+import { Staff } from '../entities/staff.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderDetails, ProductSize, ProductBranch])],
+  imports: [TypeOrmModule.forFeature([Order, OrderDetails, ProductSize, ProductBranch, Staff])],
   controllers: [BranchOrderController],
   providers: [BranchOrderService],
 })

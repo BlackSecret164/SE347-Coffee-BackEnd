@@ -135,17 +135,34 @@ export class UpdateOrderCustomerDto {
 }
 
 export enum OrderStatus {
-  PENDING = 'PENDING',
-  CONFIRMED = 'CONFIRMED',
-  PREPARING = 'PREPARING',
-  READY = 'READY',
-  DELIVERING = 'DELIVERING',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = 'Nháp',
+  PENDING = 'Chờ xác nhận',
+  CONFIRMED = 'Đã xác nhận',
+  PREPARING = 'Đang chuẩn bị',
+  READY = 'Sẵn sàng',
+  DELIVERING = 'Đang giao',
+  COMPLETED = 'Hoàn thành',
+  CANCELLED = 'Đã hủy',
 }
 
 export class UpdateOrderStatusDto {
   @ApiProperty({ enum: OrderStatus })
   @IsEnum(OrderStatus)
   status: OrderStatus;
+
+  @ApiProperty({ 
+    required: false, 
+    description: 'ID nhân viên xử lý đơn hàng (uưu tiên dùng nếu có)' 
+  })
+  @IsOptional()
+  @IsInt()
+  staffId?: number;
+
+  @ApiProperty({ 
+    required: false, 
+    description: 'Tên nhân viên xử lý đơn hàng (dùng nếu không có staffId)' 
+  })
+  @IsOptional()
+  @IsString()
+  staffName?: string;
 }
