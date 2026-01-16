@@ -13,7 +13,7 @@ export class CreatePaymentUrlDto {
 
   @IsNotEmpty()
   @IsNumber()
-  @Min(1000)
+  @Min(5000, { message: 'Số tiền tối thiểu là 5,000đ' })
   amount: number;
 
   @IsOptional()

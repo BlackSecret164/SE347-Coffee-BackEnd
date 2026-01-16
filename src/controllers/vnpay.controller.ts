@@ -31,9 +31,11 @@ export class VnpayController {
       example: {
         success: true,
         paymentUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...',
+        orderId: '123456',
       },
     },
   })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
   @ApiResponse({ status: 500, description: 'Lỗi server' })
   async createPaymentUrl(
     @Body() createPaymentDto: CreatePaymentUrlDto,
@@ -47,9 +49,11 @@ export class VnpayController {
         req.ip ||
         '127.0.0.1') as string;
 
+      const cleanIpAddr = ipAddr.replace('::ffff:', '');
+
       const result = await this.vnpayService.createPaymentUrl(
         createPaymentDto,
-        ipAddr.replace('::ffff:', ''),
+        cleanIpAddr,
       );
 
       return {
@@ -57,9 +61,10 @@ export class VnpayController {
         ...result,
       };
     } catch (error) {
+      console.error('[VNPay Controller] Error creating payment:', error);
       return {
         success: false,
-        message: 'Không thể tạo URL thanh toán',
+        message: error.message || 'Không thể tạo thanh toán VNPay',
         error: error.message,
       };
     }
