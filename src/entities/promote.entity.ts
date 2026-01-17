@@ -1,5 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { Coupon } from './coupon.entity';
+import { Branch } from './branches.entity';
 
 @Entity({ name: 'promote' })
 export class Promote {
@@ -23,6 +24,13 @@ export class Promote {
 
   @Column({ name: 'endat', type: 'timestamp', nullable: true })
   endAt: Date;
+
+  @Column({ name: 'branch_id', type: 'int', nullable: true })
+  branchId: number;
+
+  @ManyToOne(() => Branch, { nullable: true })
+  @JoinColumn({ name: 'branch_id' })
+  branch: Branch;
 
   @OneToMany(() => Coupon, (coupon) => coupon.promote)
   coupons: Coupon[];

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Delete, Put, NotFoundException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Delete, Put, NotFoundException, UseGuards, Req } from '@nestjs/common';
 import { PromoteService } from '../services/promote.service';
 import { PromoteDto } from '../dtos/promote.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -20,10 +20,15 @@ export class PromoteController {
   // --- PROMOTE ---
 
   @Get('/list')
-  @ApiOperation({ summary: 'Get list of all promotions' })
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND, EnumRoles.STAFF])
+  @ApiOperation({ summary: 'Get list of promotions (filtered by role and branch)' })
   @ApiResponse({ status: 200, description: 'List of promotions' })
-  findAll() {
-    return this.promoteService.findAll();
+  findAll(@Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    return this.promoteService.findAll(userRole, branchId);
   }
 
   @Get(':id')
@@ -41,50 +46,56 @@ export class PromoteController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM])
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND])
   @ApiOperation({ summary: 'Create a new promotion' })
   @ApiResponse({ status: 201, description: 'Promotion created successfully' })
-  create(@Body() dto: PromoteDto) {
-    return this.promoteService.create(dto);
+  create(@Body() dto: PromoteDto, @Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    return this.promoteService.create(dto, userRole, branchId);
   }
 
   @Put(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM])
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND])
   @ApiOperation({ summary: 'Update a promotion by ID' })
   @ApiResponse({ status: 200, description: 'Promotion updated successfully' })
   @ApiResponse({ status: 404, description: 'Promotion not found' })
-  async update(@Param('id') id: number, @Body() dto: PromoteDto) {
-    const updatedPromote = await this.promoteService.update(id, dto);
-    if (!updatedPromote) {
-      throw new NotFoundException(`Promotion with ID ${id} not found`);
-    }
-    return updatedPromote;
+  @ApiResponse({ status: 403, description: 'Forbidden - Cannot edit shared promotion' })
+  async update(@Param('id') id: number, @Body() dto: PromoteDto, @Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    return await this.promoteService.update(id, dto, userRole, branchId);
   }
 
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM])
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND])
   @ApiOperation({ summary: 'Delete a promotion by ID' })
   @ApiResponse({ status: 204, description: 'Promotion deleted successfully' })
   @ApiResponse({ status: 404, description: 'Promotion not found' })
-  async remove(@Param('id') id: number) {
-    const result = await this.promoteService.remove(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Promotion with ID ${id} not found`);
-    }
+  @ApiResponse({ status: 403, description: 'Forbidden - Cannot delete shared promotion' })
+  async remove(@Param('id') id: number, @Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    await this.promoteService.remove(id, userRole, branchId);
     return;
   }
 
   // --- COUPON ---
 
   @Get('/coupon/list')
-  @ApiOperation({ summary: 'Get list of all coupons' })
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND, EnumRoles.STAFF])
+  @ApiOperation({ summary: 'Get list of coupons (filtered by role and branch)' })
   @ApiResponse({ status: 200, description: 'List of coupons' })
-  findAllCoupons() {
-    return this.couponService.findAll();
+  findAllCoupons(@Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    return this.couponService.findAll(userRole, branchId);
   }
 
   @Get('/coupon/:id')
@@ -102,40 +113,41 @@ export class PromoteController {
   @Post('/coupon')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM])
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND])
   @ApiOperation({ summary: 'Create a new coupon' })
   @ApiResponse({ status: 201, description: 'Coupon created successfully' })
-  createCoupon(@Body() dto: CouponDto) {
-    return this.couponService.create(dto);
+  createCoupon(@Body() dto: CouponDto, @Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    return this.couponService.create(dto, userRole, branchId);
   }
 
   @Put('/coupon/:id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM])
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND])
   @ApiOperation({ summary: 'Update a coupon by ID' })
   @ApiResponse({ status: 200, description: 'Coupon updated successfully' })
   @ApiResponse({ status: 404, description: 'Coupon not found' })
-  async updateCoupon(@Param('id') id: number, @Body() dto: CouponDto) {
-    const updatedCoupon = await this.couponService.update(id, dto);
-    if (!updatedCoupon) {
-      throw new NotFoundException(`Coupon with ID ${id} not found`);
-    }
-    return updatedCoupon;
+  @ApiResponse({ status: 403, description: 'Forbidden - Cannot edit shared coupon' })
+  async updateCoupon(@Param('id') id: number, @Body() dto: CouponDto, @Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    return await this.couponService.update(id, dto, userRole, branchId);
   }
 
   @Delete('/coupon/:id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM])
+  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND])
   @ApiOperation({ summary: 'Delete a coupon by ID' })
   @ApiResponse({ status: 204, description: 'Coupon deleted successfully' })
   @ApiResponse({ status: 404, description: 'Coupon not found' })
-  async removeCoupon(@Param('id') id: number) {
-    const result = await this.couponService.remove(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Coupon with ID ${id} not found`);
-    }
+  @ApiResponse({ status: 403, description: 'Forbidden - Cannot delete shared coupon' })
+  async removeCoupon(@Param('id') id: number, @Req() req: any) {
+    const userRole = req.user?.role;
+    const branchId = req.user?.branchId;
+    await this.couponService.remove(id, userRole, branchId);
     return;
   }
 }
