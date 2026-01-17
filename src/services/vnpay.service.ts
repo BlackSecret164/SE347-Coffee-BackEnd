@@ -35,12 +35,15 @@ export class VnpayService {
         throw new BadRequestException('Số tiền tối thiểu là 5,000đ');
       }
 
+      // VNPay yêu cầu số tiền phải nhân 100 (VD: 50,000đ -> 5,000,000)
+      const vnpAmount = Math.floor(amount * 100);
+
       this.logger.log(
-        `[VNPay] Creating payment URL for order ${orderId}, amount: ${amount}đ, IP: ${ipAddr}`,
+        `[VNPay] Creating payment URL for order ${orderId}, amount: ${amount}đ (VNPay: ${vnpAmount}), IP: ${ipAddr}`,
       );
 
       const paymentUrl = this.vnpay.buildPaymentUrl({
-        vnp_Amount: amount,
+        vnp_Amount: vnpAmount, // Đã nhân 100
         vnp_IpAddr: ipAddr,
         vnp_TxnRef: String(orderId),
         vnp_OrderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
