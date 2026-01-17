@@ -1,13 +1,20 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Order } from 'src/entities/order_tb.entity';
-import { OrderDetails } from 'src/entities/order-details.entity';
-import { CreateOrderDto, UpdateOrderDto } from 'src/dtos/order.dto';
 import { CreateOrderDetailsDto } from 'src/dtos/order-details.dto';
+import {
+  CreateOrderDto,
+  OrderStatus,
+  UpdateOrderDto,
+} from 'src/dtos/order.dto';
+import { OrderDetails } from 'src/entities/order-details.entity';
+import { Order } from 'src/entities/order_tb.entity';
 import { ProductSize } from 'src/entities/product_size.entity';
+import { Repository } from 'typeorm';
 import { ProductBranch } from '../entities/product_branch.entity';
-import { OrderStatus } from 'src/dtos/order.dto';
 import { Staff } from '../entities/staff.entity';
 
 @Injectable()
@@ -29,8 +36,7 @@ export class BranchOrderService {
     // Thêm Staff Repository để tìm nhân viên theo tên
     @InjectRepository(Staff)
     private readonly staffRepo: Repository<Staff>,
-
-  ) { }
+  ) {}
 
   async findAllByBranch(branchId: number) {
     return this.orderRepository.find({
@@ -62,7 +68,7 @@ export class BranchOrderService {
       order.details.map(async (d) => {
         const productSize = await this.sizeRepo.findOne({
           where: {
-            product: { id: d.product.id },  // nếu có quan hệ @ManyToOne
+            product: { id: d.product.id }, // nếu có quan hệ @ManyToOne
             sizeName: d.size,
           },
         });
@@ -81,10 +87,13 @@ export class BranchOrderService {
       }),
     );
 
-    const totalProductPrice = detailItems.reduce((sum, item) => sum + item.totalItemPrice, 0);
+    const totalProductPrice = detailItems.reduce(
+      (sum, item) => sum + item.totalItemPrice,
+      0,
+    );
 
     // 3. Tính discount
-    const discount = (totalProductPrice + deliveryFee) - order.totalPrice;
+    const discount = totalProductPrice + deliveryFee - order.totalPrice;
 
     return {
       id: order.id,
@@ -125,7 +134,9 @@ export class BranchOrderService {
   }
 
   async updateInBranch(id: number, dto: UpdateOrderDto, branchId: number) {
-    const order = await this.orderRepository.findOne({ where: { id, branchId: branchId } });
+    const order = await this.orderRepository.findOne({
+      where: { id, branchId: branchId },
+    });
     if (!order) throw new NotFoundException('Order not found in this branch');
 
     Object.assign(order, dto);
@@ -133,14 +144,22 @@ export class BranchOrderService {
   }
 
   async markCompleteInBranch(id: number, branchId: number) {
-    const result = await this.orderRepository.update({ id, branchId: branchId }, { status: 'Hoàn thành' });
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found in branch`);
+    const result = await this.orderRepository.update(
+      { id, branchId: branchId },
+      { status: 'Hoàn thành' },
+    );
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found in branch`);
     return { message: 'Order marked as completed' };
   }
 
   async markCancelInBranch(id: number, branchId: number) {
-    const result = await this.orderRepository.update({ id, branchId: branchId }, { status: 'Đã hủy' });
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found in branch`);
+    const result = await this.orderRepository.update(
+      { id, branchId: branchId },
+      { status: 'Đã hủy' },
+    );
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found in branch`);
     return { message: 'Order marked as cancelled' };
   }
 
@@ -151,29 +170,32 @@ export class BranchOrderService {
    * @param staffName - Tên nhân viên (dùng nếu không có staffId)
    */
   async updateStatus(
-    orderId: number, 
-    newStatus: OrderStatus, 
-    branchId: number, 
+    orderId: number,
+    newStatus: OrderStatus,
+    branchId: number,
     staffId?: number,
-    staffName?: string
+    staffName?: string,
   ) {
+    console.log(`Checking order ${orderId} in branch ${branchId}`);
     // Lấy order với relation staff để kiểm tra
-    const order = await this.orderRepo.findOne({ 
+    const order = await this.orderRepo.findOne({
       where: { id: orderId, branch: { id: branchId } },
-      relations: ['staff', 'branch']
+      relations: ['staff', 'branch'],
     });
-    
+
     if (!order) {
+      console.error(`Order ${orderId} NOT FOUND in branch ${branchId}`);
       throw new NotFoundException('Order not found in your branch');
     }
 
     // Kiểm tra: Nếu đơn đang ở "Chờ xác nhận" và chuyển sang trạng thái khác
-    const isLeavingPending = order.status === OrderStatus.PENDING && newStatus !== OrderStatus.PENDING;
-    
+    const isLeavingPending =
+      order.status === OrderStatus.PENDING && newStatus !== OrderStatus.PENDING;
+
     // Nếu đang chuyển từ "Chờ xác nhận" VÀ chưa có nhân viên VÀ không có staffId/staffName
     if (isLeavingPending && !order.staffID && !staffId && !staffName) {
       throw new BadRequestException(
-        'Vui lòng chỉ định nhân viên xử lý đơn hàng khi xác nhận (staffId hoặc staffName)'
+        'Vui lòng chỉ định nhân viên xử lý đơn hàng khi xác nhận (staffId hoặc staffName)',
       );
     }
 
@@ -185,41 +207,40 @@ export class BranchOrderService {
     // Logic gán nhân viên: Uưu tiên staffId, nếu không có thì dùng staffName
     if (staffId) {
       // Cách 1: Dùng staffId (nhanh và chính xác)
-      const staff = await this.staffRepo.findOne({ 
-        where: { 
+      const staff = await this.staffRepo.findOne({
+        where: {
           id: staffId,
-          branch: { id: branchId }
-        } 
+          branch: { id: branchId },
+        },
       });
-      
+
       if (!staff) {
         throw new NotFoundException(
-          `Không tìm thấy nhân viên với ID ${staffId} trong chi nhánh`
+          `Không tìm thấy nhân viên với ID ${staffId} trong chi nhánh`,
         );
       }
-      
+
       // Gán nhân viên cho đơn hàng
       order.staffID = staff.id;
       order.staff = staff;
       assignedStaffName = staff.name;
-      
     } else if (staffName) {
       // Cách 2: Dùng staffName (tìm theo tên, trim và case-insensitive)
       const trimmedName = staffName.trim();
-      
+
       // Sử dụng query builder để search case-insensitive và trim
       const staff = await this.staffRepo
         .createQueryBuilder('staff')
         .where('LOWER(TRIM(staff.name)) = LOWER(:name)', { name: trimmedName })
         .andWhere('staff.branchId = :branchId', { branchId })
         .getOne();
-      
+
       if (!staff) {
         throw new NotFoundException(
-          `Không tìm thấy nhân viên "${trimmedName}" trong chi nhánh`
+          `Không tìm thấy nhân viên "${trimmedName}" trong chi nhánh`,
         );
       }
-      
+
       // Gán nhân viên cho đơn hàng
       order.staffID = staff.id;
       order.staff = staff;
@@ -227,16 +248,20 @@ export class BranchOrderService {
     }
 
     const savedOrder = await this.orderRepo.save(order);
-    
+
     return {
       ...savedOrder,
       message: assignedStaffName
         ? `Đã cập nhật trạng thái thành "${newStatus}" và gán cho nhân viên "${assignedStaffName}" (ID: ${savedOrder.staffID})`
-        : `Đã cập nhật trạng thái thành "${newStatus}"`
+        : `Đã cập nhật trạng thái thành "${newStatus}"`,
     };
   }
 
-  async addDetailInBranch(orderID: number, dto: CreateOrderDetailsDto, branchId: number) {
+  async addDetailInBranch(
+    orderID: number,
+    dto: CreateOrderDetailsDto,
+    branchId: number,
+  ) {
     // 1. Kiểm tra đơn hàng
     const order = await this.orderRepository.findOne({
       where: { id: orderID, branch: { id: branchId } },
@@ -264,10 +289,13 @@ export class BranchOrderService {
     return this.detailRepo.save(detail);
   }
 
-
   async remove(id: number, branchId: number) {
-    const result = await this.orderRepository.delete({ id, branchId: branchId });
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found in branch`);
+    const result = await this.orderRepository.delete({
+      id,
+      branchId: branchId,
+    });
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found in branch`);
     return { message: 'Order deleted successfully' };
   }
 }

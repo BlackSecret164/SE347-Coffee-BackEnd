@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Order } from '../entities/order_tb.entity';
-import { Repository, DataSource } from 'typeorm';
-import { CreateOrderDto, UpdateOrderCustomerDto, CreateOrderCustomerDto } from '../dtos/order.dto';
-import { OrderDetails } from '../entities/order-details.entity';
 import { CreateOrderDetailsDto } from 'src/dtos/order-details.dto';
-import { camelCase } from 'lodash';
+import { DataSource, Repository } from 'typeorm';
+import {
+  CreateOrderCustomerDto,
+  UpdateOrderCustomerDto,
+} from '../dtos/order.dto';
+import { OrderDetails } from '../entities/order-details.entity';
+import { Order } from '../entities/order_tb.entity';
 
 @Injectable()
 export class OrderService {
@@ -15,7 +17,7 @@ export class OrderService {
     @InjectRepository(OrderDetails)
     private readonly detailRepo: Repository<OrderDetails>,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   async findAll() {
     return this.orderRepo
@@ -92,25 +94,29 @@ export class OrderService {
 
   async update(id: number, dto: UpdateOrderCustomerDto) {
     const result = await this.orderRepo.update(id, dto);
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found`);
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found`);
     return { message: 'Order edited successfully' };
   }
 
   async markComplete(id: number) {
     const result = await this.orderRepo.update(id, { status: 'Hoàn thành' });
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found`);
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found`);
     return { message: 'Order marked as completed' };
   }
 
   async markCancel(id: number) {
     const result = await this.orderRepo.update(id, { status: 'Đã hủy' });
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found`);
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found`);
     return { message: 'Order marked as cancelled' };
   }
 
   async remove(id: number) {
     const result = await this.orderRepo.delete(id);
-    if (result.affected === 0) throw new NotFoundException(`Order ${id} not found`);
+    if (result.affected === 0)
+      throw new NotFoundException(`Order ${id} not found`);
     return { message: 'Order deleted successfully' };
   }
 
@@ -129,7 +135,7 @@ export class OrderService {
       order: { orderDate: 'DESC' },
     });
 
-    return orders.map(order => ({
+    return orders.map((order) => ({
       id: order.id,
       serviceType: order.serviceType,
       orderDate: order.orderDate,
@@ -137,9 +143,12 @@ export class OrderService {
       branchId: order.branchId,
       branchName: order.branch?.name ?? '',
       totalPrice: order.totalPrice,
+      paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod,
+
       order_details: (order.details || [])
-        .filter(d => d && d.product && d.product.id)
-        .map(d => ({
+        .filter((d) => d && d.product && d.product.id)
+        .map((d) => ({
           productId: d.product.id,
           size: d.size,
           mood: d.mood,
@@ -162,7 +171,9 @@ export class OrderService {
       branchId: order.branchId,
       branchName: order.branch?.name ?? '',
       totalPrice: order.totalPrice,
-      order_details: order.details.map(d => ({
+      paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod,
+      order_details: order.details.map((d) => ({
         productId: d.product.id,
         size: d.size,
         mood: d.mood,
@@ -185,5 +196,4 @@ export class OrderService {
 
     return { message: 'Order cancelled by customer' };
   }
-
 }

@@ -1,11 +1,11 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductCode, VnpLocale } from 'vnpay';
-import { createVNPayInstance } from '../vnpay.config';
 import { CreatePaymentUrlDto, PaymentResponseDto } from '../dtos/vnpay.dto';
-import { VNPayTransaction } from '../entities/vnpay-transaction.entity';
 import { Order } from '../entities/order_tb.entity';
+import { VNPayTransaction } from '../entities/vnpay-transaction.entity';
+import { createVNPayInstance } from '../vnpay.config';
 
 @Injectable()
 export class VnpayService {
@@ -36,14 +36,14 @@ export class VnpayService {
       }
 
       // VNPay yêu cầu số tiền phải nhân 100 (VD: 50,000đ -> 5,000,000)
-      const vnpAmount = Math.floor(amount * 100);
+      const vnpAmount = Math.floor(amount);
 
       this.logger.log(
         `[VNPay] Creating payment URL for order ${orderId}, amount: ${amount}đ (VNPay: ${vnpAmount}), IP: ${ipAddr}`,
       );
 
       const paymentUrl = this.vnpay.buildPaymentUrl({
-        vnp_Amount: vnpAmount, // Đã nhân 100
+        vnp_Amount: vnpAmount,
         vnp_IpAddr: ipAddr,
         vnp_TxnRef: String(orderId),
         vnp_OrderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
@@ -53,7 +53,6 @@ export class VnpayService {
         ...(bankCode && { vnp_BankCode: bankCode }),
       });
 
-      this.logger.log(`[VNPay] Payment URL created successfully for order ${orderId}`);
       this.logger.debug(`[VNPay] Payment URL: ${paymentUrl}`);
 
       return { paymentUrl, orderId: String(orderId) };
@@ -69,7 +68,10 @@ export class VnpayService {
   async verifyPayment(vnpayParams: any): Promise<PaymentResponseDto> {
     try {
       this.logger.log('[VNPay] Verifying payment callback from VNPay');
-      this.logger.debug('[VNPay] Callback params:', JSON.stringify(vnpayParams));
+      this.logger.debug(
+        '[VNPay] Callback params:',
+        JSON.stringify(vnpayParams),
+      );
 
       // Xác thực signature và kết quả thanh toán
       const verify = this.vnpay.verifyReturnUrl(vnpayParams);
@@ -84,7 +86,7 @@ export class VnpayService {
 
       const responseCode = vnpayParams.vnp_ResponseCode;
       const orderId = verify.vnp_TxnRef;
-      const amount = Number(verify.vnp_Amount) / 100; // VNPay trả về số tiền đã nhân 100
+      const amount = Number(verify.vnp_Amount);
       const transactionNo = verify.vnp_TransactionNo;
       const bankCode = verify.vnp_BankCode;
       const payDate = verify.vnp_PayDate;
@@ -117,6 +119,7 @@ export class VnpayService {
         await this.updateOrderPaymentStatus(Number(orderId), {
           paymentStatus: 'Đã thanh toán',
           paymentMethod: 'VNPay',
+          status: 'Chờ xác nhận',
         });
 
         return {
@@ -256,16 +259,13 @@ export class VnpayService {
       // Save single entity (not array)
       const saved = await this.vnpayTransactionRepo.save(transaction);
       const result = Array.isArray(saved) ? saved[0] : saved;
-      
+
       this.logger.log(
         `[VNPay] Transaction saved with ID: ${result.id} for order ${data.orderId}`,
       );
       return result;
     } catch (error) {
-      this.logger.error(
-        `[VNPay] Error saving transaction:`,
-        error.message,
-      );
+      this.logger.error(`[VNPay] Error saving transaction:`, error.message);
       throw error;
     }
   }
