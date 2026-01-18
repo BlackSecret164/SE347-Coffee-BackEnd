@@ -40,6 +40,15 @@ export class RatingController {
         return this.ratingService.findByProduct(productId);
     }
 
+    @Get('order/:orderId/product/:productId')
+    @ApiOperation({ summary: 'Get rating by order ID and product ID' })
+    getRatingByOrderAndProduct(
+        @Param('orderId', ParseIntPipe) orderId: number,
+        @Param('productId', ParseIntPipe) productId: number,
+    ) {
+        return this.ratingService.getRatingByOrderAndProduct(orderId, productId);
+    }
+
     @Put(':id')
     update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRatingDto) {
         return this.ratingService.update(id, dto);

@@ -201,4 +201,35 @@ export class RatingService {
             },
         }));
     }
+
+    async getRatingByOrderAndProduct(orderId: number, productId: number) {
+        const rating = await this.ratingRepo.findOne({
+            where: {
+                orderId: orderId,
+                productId: productId,
+            },
+            relations: ['customer', 'product'],
+        });
+
+        if (!rating) {
+            return null;
+        }
+
+        return {
+            id: rating.id,
+            description: rating.description,
+            star: rating.star,
+            createdAt: rating.createdAt,
+            customer: {
+                phone: rating.customer.phone,
+                name: rating.customer.name,
+                rank: rating.customer.rank,
+            },
+            product: {
+                id: rating.product.id,
+                name: rating.product.name,
+                image: rating.product.image,
+            },
+        };
+    }
 }
