@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Rating } from '../entities/rating.entity';
 import { Repository } from 'typeorm';
@@ -31,15 +31,35 @@ export class RatingService {
             throw new NotFoundException('Customer or Product not found');
         }
 
-        const hasPurchased = await this.detailRepo
-            .createQueryBuilder('detail')
-            .innerJoin('detail.order', 'order')
-            .where('order.phoneCustomer = :phone', { phone: dto.phoneCustomer })
-            .andWhere('detail.productID = :productId', { productId: dto.productId })
-            .getExists();
+        // Nếu có orderId, kiểm tra đơn hàng có chứa sản phẩm này không
+        if (dto.orderId) {
+            const order = await this.orderRepo.findOne({ where: { id: dto.orderId } });
+            if (!order) {
+                throw new NotFoundException('Order not found');
+            }
 
-        if (!hasPurchased) {
-            throw new NotFoundException('Customer must purchase the product before rating');
+            const orderDetail = await this.detailRepo.findOne({
+                where: {
+                    orderID: dto.orderId,
+                    productID: dto.productId,
+                },
+            });
+
+            if (!orderDetail) {
+                throw new BadRequestException('Product not found in this order');
+            }
+        } else {
+            // Nếu không có orderId, kiểm tra customer đã mua sản phẩm chưa
+            const hasPurchased = await this.detailRepo
+                .createQueryBuilder('detail')
+                .innerJoin('detail.order', 'order')
+                .where('order.phoneCustomer = :phone', { phone: dto.phoneCustomer })
+                .andWhere('detail.productID = :productId', { productId: dto.productId })
+                .getExists();
+
+            if (!hasPurchased) {
+                throw new BadRequestException('Customer must purchase the product before rating');
+            }
         }
 
         const rating = this.ratingRepo.create({
@@ -47,6 +67,7 @@ export class RatingService {
             star: dto.star,
             customer,
             product,
+            orderId: dto.orderId || null,
         });
 
         return this.ratingRepo.save(rating);
@@ -137,5 +158,34 @@ export class RatingService {
             throw new NotFoundException(`Rating with ID ${id} not found`);
         }
         return { message: 'Rating deleted successfully' };
+    }
+
+    async getBranchRatings(branchId: number): Promise<ListRatingResponseDto[]> {
+        // Lấy tất cả ratings có orderId thuộc chi nhánh
+        const ratings = await this.ratingRepo
+            .createQueryBuilder('rating')
+            .leftJoinAndSelect('rating.customer', 'customer')
+            .leftJoinAndSelect('rating.product', 'product')
+            .leftJoinAndSelect('rating.order', 'order')
+            .where('order.branchId = :branchId', { branchId })
+            .orderBy('rating.createdAt', 'DESC')
+            .getMany();
+
+        return ratings.map((r) => ({
+            id: r.id,
+            description: r.description,
+            star: r.star,
+            createdAt: r.createdAt,
+            customer: {
+                phone: r.customer.phone,
+                name: r.customer.name,
+                rank: r.customer.rank,
+            },
+            product: {
+                id: r.product.id,
+                name: r.product.name,
+                image: r.product.image,
+            },
+        }));
     }
 }
