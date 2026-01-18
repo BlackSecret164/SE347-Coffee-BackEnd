@@ -153,6 +153,7 @@ export class OrderService {
           size: d.size,
           mood: d.mood,
           quantity: d.quantity,
+          feedback: d.feedback,
         })),
     }));
   }
@@ -178,6 +179,7 @@ export class OrderService {
         size: d.size,
         mood: d.mood,
         quantity: d.quantity,
+        feedback: d.feedback,
       })),
     };
   }

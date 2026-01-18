@@ -26,4 +26,7 @@ export class OrderDetails {
 
   @Column({ type: 'varchar', length: 5, nullable: true })
   mood: string;
+
+  @Column({ type: 'boolean', default: false })
+  feedback: boolean;
 }

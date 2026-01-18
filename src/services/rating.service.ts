@@ -70,7 +70,20 @@ export class RatingService {
             orderId: dto.orderId || null,
         });
 
-        return this.ratingRepo.save(rating);
+        const savedRating = await this.ratingRepo.save(rating);
+
+        // Nếu có orderId, cập nhật feedback = true cho order_detail
+        if (dto.orderId) {
+            await this.detailRepo.update(
+                {
+                    orderID: dto.orderId,
+                    productID: dto.productId,
+                },
+                { feedback: true }
+            );
+        }
+
+        return savedRating;
     }
 
     async findAll(): Promise<ListRatingResponseDto[]> {
