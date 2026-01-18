@@ -38,6 +38,14 @@ export class Product {
   @Column({ name: 'isnew', type: 'boolean', default: false })
   isNew: boolean;
 
+  @Column({ 
+    type: 'varchar', 
+    length: 20, 
+    default: 'Hệ thống',
+    comment: 'Phạm vi sản phẩm: "Hệ thống" hoặc "Chi nhánh"'
+  })
+  scope: string;
+
   @OneToMany(() => ProductMaterial, (pm) => pm.product)
   productMaterials: ProductMaterial[];
 

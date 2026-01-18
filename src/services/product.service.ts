@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, IsNull, In } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { ProductSize } from '../entities/product_size.entity';
 import { CreateProductDto } from '../dtos/product.dto';
@@ -25,7 +25,75 @@ export class ProductService {
     private readonly dataSource: DataSource,
   ) { }
 
-  async findAll() {
+  async findAll(userRole?: string, userBranchId?: number) {
+    if (userRole === 'ADMIN_SYSTEM') {
+      // ADMIN_SYSTEM chỉ xem sản phẩm hệ thống
+      const products = await this.productRepo.find({
+        where: { scope: 'Hệ thống' },
+        relations: {
+          sizes: true,
+          productMaterials: {
+            rawMaterial: true,
+          },
+        },
+        order: { id: 'ASC' },
+      });
+
+      return this.mapProducts(products);
+    } else if (userRole === 'CUSTOMER') {
+      // CUSTOMER chỉ xem sản phẩm hệ thống (không thấy sản phẩm độc quyền)
+      const products = await this.productRepo.find({
+        where: { scope: 'Hệ thống' },
+        relations: {
+          sizes: true,
+          productMaterials: {
+            rawMaterial: true,
+          },
+        },
+        order: { id: 'ASC' },
+      });
+
+      return this.mapProducts(products);
+    } else if ((userRole === 'ADMIN_BRAND' || userRole === 'STAFF') && userBranchId) {
+      // ADMIN_BRAND và STAFF xem sản phẩm hệ thống + sản phẩm trong ProductBranch của mình
+      const systemProducts = await this.productRepo.find({
+        where: { scope: 'Hệ thống' },
+        relations: {
+          sizes: true,
+          productMaterials: {
+            rawMaterial: true,
+          },
+        },
+      });
+
+      // Lấy các sản phẩm chi nhánh của mình
+      const branchProductRecords = await this.productBranchRepo.find({
+        where: { branchId: userBranchId },
+        relations: {
+          product: {
+            sizes: true,
+            productMaterials: {
+              rawMaterial: true,
+            },
+          },
+        },
+      });
+
+      const branchProducts = branchProductRecords
+        .map(pb => pb.product)
+        .filter(p => p.scope === 'Chi nhánh');
+
+      // Gộp 2 danh sách và loại trùng
+      const allProducts = [...systemProducts, ...branchProducts]
+        .filter((product, index, self) => 
+          index === self.findIndex(p => p.id === product.id)
+        )
+        .sort((a, b) => a.id - b.id);
+
+      return this.mapProducts(allProducts);
+    }
+
+    // Default: return all
     const products = await this.productRepo.find({
       relations: {
         sizes: true,
@@ -36,6 +104,10 @@ export class ProductService {
       order: { id: 'ASC' },
     });
 
+    return this.mapProducts(products);
+  }
+
+  private mapProducts(products: Product[]) {
     return products.map((product) => ({
       id: product.id.toString(),
       name: product.name,
@@ -47,6 +119,7 @@ export class ProductService {
       cold: product.cold,
       isPopular: product.isPopular,
       isNew: product.isNew,
+      scope: product.scope,
       sizes: product.sizes
         .sort((a, b) => {
           const order = { 'S': 1, 'M': 2, 'L': 3 };
@@ -231,7 +304,7 @@ export class ProductService {
     return this.findAll();
   }
 
-  async create(createDto: CreateProductDto) {
+  async create(createDto: CreateProductDto, userRole?: string, userBranchId?: number) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -239,7 +312,13 @@ export class ProductService {
     try {
       const { sizes, productMaterials, ...productData } = createDto;
 
-      const product = await queryRunner.manager.save(Product, productData);
+      // Xác định scope dựa trên role
+      const scope = userRole === 'ADMIN_SYSTEM' ? 'Hệ thống' : 'Chi nhánh';
+
+      const product = await queryRunner.manager.save(Product, {
+        ...productData,
+        scope,
+      });
 
       const sizeEntities = sizes.map((s) => {
         const size = new ProductSize();
@@ -263,17 +342,30 @@ export class ProductService {
       }
 
       await queryRunner.commitTransaction();
-      const branches = await queryRunner.manager.find(Branch);
 
-      const productBranches = branches.map((branch) => {
-        const pb = new ProductBranch();
-        pb.product = product;
-        pb.branch = branch;
-        pb.available = true;
-        return pb;
-      });
-
-      await queryRunner.manager.save(ProductBranch, productBranches);
+      // Logic khác nhau cho ADMIN_SYSTEM và ADMIN_BRAND
+      if (scope === 'Hệ thống') {
+        // ADMIN_SYSTEM: thêm vào tất cả chi nhánh
+        const branches = await queryRunner.manager.find(Branch);
+        const productBranches = branches.map((branch) => {
+          const pb = new ProductBranch();
+          pb.product = product;
+          pb.branch = branch;
+          pb.available = true;
+          return pb;
+        });
+        await queryRunner.manager.save(ProductBranch, productBranches);
+      } else if (userBranchId) {
+        // ADMIN_BRAND: chỉ thêm vào chi nhánh của mình
+        const branch = await queryRunner.manager.findOne(Branch, { where: { id: userBranchId } });
+        if (branch) {
+          const pb = new ProductBranch();
+          pb.product = product;
+          pb.branch = branch;
+          pb.available = true;
+          await queryRunner.manager.save(ProductBranch, pb);
+        }
+      }
 
       return { message: 'Product created successfully', id: product.id };
     } catch (err) {
@@ -284,13 +376,34 @@ export class ProductService {
     }
   }
 
-  async update(id: number, updateDto: UpdateProductDto) {
+  async update(id: number, updateDto: UpdateProductDto, userRole?: string, userBranchId?: number) {
     const product = await this.productRepo.findOne({
       where: { id },
       relations: ['sizes', 'productMaterials'],
     });
 
     if (!product) throw new NotFoundException('Product not found');
+
+    // Kiểm tra quyền
+    if (userRole === 'ADMIN_SYSTEM') {
+      // ADMIN_SYSTEM chỉ được sửa sản phẩm Hệ thống
+      if (product.scope === 'Chi nhánh') {
+        throw new ForbiddenException('Bạn không có quyền sửa sản phẩm độc quyền của chi nhánh');
+      }
+    } else if (userRole === 'ADMIN_BRAND') {
+      if (product.scope === 'Hệ thống') {
+        throw new ForbiddenException('Bạn không có quyền sửa sản phẩm hệ thống');
+      }
+      
+      // Kiểm tra xem sản phẩm có thuộc chi nhánh của mình không
+      const productBranch = await this.productBranchRepo.findOne({
+        where: { productId: id, branchId: userBranchId },
+      });
+      
+      if (!productBranch) {
+        throw new ForbiddenException('Bạn không có quyền sửa sản phẩm của chi nhánh khác');
+      }
+    }
 
     const { sizes, productMaterials, ...productUpdate } = updateDto;
 
@@ -333,7 +446,34 @@ export class ProductService {
     return { message: 'Product availability updated' };
   }
 
-  async remove(id: number) {
+  async remove(id: number, userRole?: string, userBranchId?: number) {
+    const product = await this.productRepo.findOne({ where: { id } });
+    
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Kiểm tra quyền
+    if (userRole === 'ADMIN_SYSTEM') {
+      // ADMIN_SYSTEM chỉ được xóa sản phẩm Hệ thống
+      if (product.scope === 'Chi nhánh') {
+        throw new ForbiddenException('Bạn không có quyền xóa sản phẩm độc quyền của chi nhánh');
+      }
+    } else if (userRole === 'ADMIN_BRAND') {
+      if (product.scope === 'Hệ thống') {
+        throw new ForbiddenException('Bạn không có quyền xóa sản phẩm hệ thống');
+      }
+      
+      // Kiểm tra xem sản phẩm có thuộc chi nhánh của mình không
+      const productBranch = await this.productBranchRepo.findOne({
+        where: { productId: id, branchId: userBranchId },
+      });
+      
+      if (!productBranch) {
+        throw new ForbiddenException('Bạn không có quyền xóa sản phẩm của chi nhánh khác');
+      }
+    }
+
     const result = await this.productRepo.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException('Product not found');
