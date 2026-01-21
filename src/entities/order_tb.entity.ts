@@ -62,4 +62,7 @@ export class Order {
 
   @Column({ name: 'branchid', type: 'int' })
   branchId: number;
+
+  @Column({ name: 'discount', type: 'int', default: 0 })
+  discount: number;
 }

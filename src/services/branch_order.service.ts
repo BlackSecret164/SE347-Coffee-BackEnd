@@ -92,9 +92,6 @@ export class BranchOrderService {
       0,
     );
 
-    // 3. Tính discount
-    const discount = totalProductPrice + deliveryFee - order.totalPrice;
-
     return {
       id: order.id,
       phoneCustomer: order.phoneCustomer,
@@ -105,7 +102,7 @@ export class BranchOrderService {
       status: order.status,
       totalPrice: order.totalPrice,
       deliveryFee: deliveryFee,
-      discount: discount,
+      discount: order.discount || 0,
       order_details: order.details.map((d) => ({
         productId: d.product.id,
         size: d.size,

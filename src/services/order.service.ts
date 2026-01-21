@@ -29,6 +29,7 @@ export class OrderService {
         'order.phoneCustomer AS "phoneCustomer"',
         'order.serviceType AS "serviceType"',
         'order.totalPrice AS "totalPrice"',
+        'order.discount AS "discount"',
         'order.tableID AS "tableID"',
         'order.orderDate AS "orderDate"',
         'order.status AS "status"',
@@ -70,6 +71,7 @@ export class OrderService {
         'order.phoneCustomer AS "phoneCustomer"',
         'order.serviceType AS "serviceType"',
         'order.totalPrice AS "totalPrice"',
+        'order.discount AS "discount"',
         'order.tableID AS "tableID"',
         'order.orderDate AS "orderDate"',
         'order.status AS "status"',
@@ -143,6 +145,7 @@ export class OrderService {
       branchId: order.branchId,
       branchName: order.branch?.name ?? '',
       totalPrice: order.totalPrice,
+      discount: order.discount,
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
 
@@ -172,6 +175,7 @@ export class OrderService {
       branchId: order.branchId,
       branchName: order.branch?.name ?? '',
       totalPrice: order.totalPrice,
+      discount: order.discount,
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
       order_details: order.details.map((d) => ({

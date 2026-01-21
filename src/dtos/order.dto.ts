@@ -75,6 +75,12 @@ export class UpdateOrderDto {
   @ApiProperty()
   @IsString()
   paymentStatus: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  discount?: number;
 }
 
 export class CreateOrderCustomerDto {
@@ -101,6 +107,12 @@ export class CreateOrderCustomerDto {
   @ApiProperty()
   @IsInt()
   branchId: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  discount?: number;
 }
 
 export class UpdateOrderCustomerDto {
@@ -132,6 +144,12 @@ export class UpdateOrderCustomerDto {
   @ApiProperty()
   @IsString()
   paymentStatus: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  discount?: number;
 }
 
 export enum OrderStatus {
