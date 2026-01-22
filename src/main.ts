@@ -21,7 +21,7 @@ async function bootstrap() {
       'https://doan2cafe.onrender.com',
       'https://testapi-roan.vercel.app',
       'https://doan2cafe-production.up.railway.app',
-      'https://se-347-coffee-chain-system.vercel.app/',
+      'https://se-347-coffee-chain-system.vercel.app',
       'http://103.209.34.233'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
