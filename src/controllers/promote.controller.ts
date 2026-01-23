@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Delete, Put, NotFoundException, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Delete, Put, NotFoundException, UseGuards, Req, Query } from '@nestjs/common';
 import { PromoteService } from '../services/promote.service';
 import { PromoteDto } from '../dtos/promote.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -85,6 +85,15 @@ export class PromoteController {
   }
 
   // --- COUPON ---
+
+  @Get('/coupon/check')
+  @ApiOperation({ summary: 'Check coupon by code (public - no auth required)' })
+  @ApiResponse({ status: 200, description: 'Coupon is valid' })
+  @ApiResponse({ status: 404, description: 'Coupon not found' })
+  @ApiResponse({ status: 400, description: 'Coupon is expired or inactive' })
+  async checkCoupon(@Query('code') code: string, @Query('branchId') branchId?: number) {
+    return await this.couponService.findByCode(code, branchId);
+  }
 
   @Get('/coupon/list')
   @ApiBearerAuth()

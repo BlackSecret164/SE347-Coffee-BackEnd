@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Coupon } from '../entities/coupon.entity';
 import { Repository, IsNull } from 'typeorm';
@@ -49,6 +49,65 @@ export class CouponService {
     if (!coupon) {
       throw new NotFoundException(`Coupon with ID ${id} not found`);
     }
+    return coupon;
+  }
+
+  /**
+   * Kiểm tra mã coupon theo code string
+   * - Endpoint này cho phép Customer/Guest sử dụng
+   * - Chỉ trả về coupon đang hoạt động
+   */
+  async findByCode(code: string, branchId?: number) {
+    if (!code || code.trim() === '') {
+      throw new BadRequestException('Mã giảm giá không được để trống');
+    }
+
+    // Tìm coupon theo code (có thể là coupon chung hoặc của chi nhánh cụ thể)
+    const queryBuilder = this.couponRepo
+      .createQueryBuilder('coupon')
+      .leftJoinAndSelect('coupon.promote', 'promote')
+      .leftJoinAndSelect('coupon.branch', 'branch')
+      .where('UPPER(coupon.code) = UPPER(:code)', { code: code.trim() });
+
+    // Nếu có branchId, cho phép coupon chung hoặc coupon của chi nhánh đó
+    if (branchId) {
+      queryBuilder.andWhere(
+        '(coupon.branchId IS NULL OR coupon.branchId = :branchId)',
+        { branchId }
+      );
+    } else {
+      // Nếu không có branchId, chỉ lấy coupon chung
+      queryBuilder.andWhere('coupon.branchId IS NULL');
+    }
+
+    const coupon = await queryBuilder.getOne();
+
+    if (!coupon) {
+      throw new NotFoundException('Mã giảm giá không tồn tại hoặc không áp dụng cho chi nhánh này');
+    }
+
+    // Kiểm tra trạng thái (case-insensitive) - chấp nhận các giá trị: Active, Hoạt động, Có hiệu lực
+    const status = coupon.status?.toLowerCase().trim();
+    const validStatuses = ['active', 'hoạt động', 'có hiệu lực'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestException('Mã giảm giá đã hết hạn hoặc ngưng hoạt động');
+    }
+
+    // Kiểm tra thời gian khuyến mãi (nếu có)
+    if (coupon.promote) {
+      const now = new Date();
+      const startDate = new Date(coupon.promote.startAt);
+      const endDate = new Date(coupon.promote.endAt);
+
+      if (now < startDate) {
+        throw new BadRequestException('Chương trình khuyến mãi chưa bắt đầu');
+      }
+
+      if (now > endDate) {
+        throw new BadRequestException('Chương trình khuyến mãi đã kết thúc');
+      }
+    }
+
     return coupon;
   }
 
