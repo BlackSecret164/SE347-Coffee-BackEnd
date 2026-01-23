@@ -22,6 +22,11 @@ export class CreateCartItemDto {
   @ApiProperty()
   @IsString()
   phoneCustomer: string;
+
+  @ApiProperty({ required: false, description: 'Branch ID (optional, for filtering products by branch)' })
+  @IsOptional()
+  @IsNumber()
+  branchId?: number;
 }
 
 export class UpdateCartItemDto {

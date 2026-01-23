@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { CartService } from '../services/cart.service';
 import { CreateCartItemDto, UpdateCartItemDto } from '../dtos/cart.dto';
-import { ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Cart')
 @Controller('cart')
@@ -25,6 +25,18 @@ export class CartController {
       throw new BadRequestException('phoneCustomer is required');
     }
     return this.cartService.findAll(phoneCustomer);
+  }
+
+  // Thêm endpoint để lấy branchId của giỏ hàng hiện tại
+  @Get('branch')
+  @ApiOperation({ summary: 'Get branch ID of current cart' })
+  @ApiQuery({ name: 'phoneCustomer', required: true })
+  async getCartBranch(@Query('phoneCustomer') phoneCustomer: string) {
+    if (!phoneCustomer) {
+      throw new BadRequestException('phoneCustomer is required');
+    }
+    const branchId = await this.cartService.getCartBranchId(phoneCustomer);
+    return { branchId };
   }
 
   @Post()

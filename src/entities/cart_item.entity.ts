@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNumber, IsString } from 'class-validator';
 import { Customer } from './customer.entity';
 import { Product } from './product.entity';
+import { Branch } from './branches.entity';
 
 @Entity('cart_item')
 export class CartItem {
@@ -44,4 +45,11 @@ export class CartItem {
   @ManyToOne(() => Product, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'productid' })
   product: Product;
+
+  @ManyToOne(() => Branch, {nullable: true})
+  @JoinColumn({ name: 'branchid' })
+  branch: Branch;
+
+  @Column({ name: 'branchid', type: 'int' })
+  branchId: number;
 }

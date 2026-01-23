@@ -1,5 +1,4 @@
-// services/cart.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CartItem } from '../entities/cart_item.entity';
@@ -20,7 +19,7 @@ export class CartService {
   async findAll(phoneCustomer: string) {
     const items = await this.cartRepo.find({
       where: { phoneCustomer },
-      relations: ['product'],
+      relations: ['product', 'branch'],
     });
 
     return Promise.all(
@@ -41,6 +40,7 @@ export class CartService {
           name: item.product.name,
           image: item.product.image,
           price: productSize?.price ?? 0,
+          branchId: item.branchId,
         };
       }),
     );
@@ -52,6 +52,26 @@ export class CartService {
     });
     if (!product) throw new NotFoundException('Product not found');
 
+    // Kiểm tra nếu có branchId trong DTO
+    if (dto.branchId) {
+      const existingCartItems = await this.cartRepo.find({
+        where: { phoneCustomer: dto.phoneCustomer },
+      });
+
+      // Nếu giỏ hàng đã có sản phẩm từ chi nhánh khác
+      const conflictItem = existingCartItems.find(
+        (item) => item.branchId && item.branchId !== dto.branchId
+      );
+
+      if (conflictItem) {
+        throw new ConflictException(
+          `Giỏ hàng chỉ có thể chứa sản phẩm từ một chi nhánh. ` +
+          `Vui lòng xóa giỏ hàng hoặc chọn sản phẩm từ cùng chi nhánh.`
+        );
+      }
+    }
+
+    // Kiểm tra sản phẩm đã tồn tại trong giỏ chưa
     const existingItem = await this.cartRepo.findOne({
       where: {
         phoneCustomer: dto.phoneCustomer,
@@ -67,12 +87,14 @@ export class CartService {
       return this.cartRepo.save(existingItem);
     }
 
+    // Tạo mục giỏ hàng mới
     const cartItem = this.cartRepo.create({
       phoneCustomer: dto.phoneCustomer,
       quantity: dto.quantity,
       size: dto.size,
       mood: dto.mood,
       product,
+      branchId: dto.branchId,
     });
 
     return this.cartRepo.save(cartItem);
@@ -85,6 +107,7 @@ export class CartService {
     item.quantity = dto.quantity;
     item.size = dto.size;
     item.mood = dto.mood;
+    // Note: không update branchId (đã cố định khi create)
 
     return this.cartRepo.save(item);
   }
@@ -101,5 +124,13 @@ export class CartService {
     await this.cartRepo.delete({ phoneCustomer });
     return { message: 'Cart cleared' };
   }
-}
 
+  // Lấy branchId từ mục giỏ hàng đầu tiên của khách hàng
+  async getCartBranchId(phoneCustomer: string): Promise<number | null> {
+    const firstItem = await this.cartRepo.findOne({
+      where: { phoneCustomer },
+      order: { id: 'ASC' },
+    });
+    return firstItem?.branchId ?? null;
+  }
+}
