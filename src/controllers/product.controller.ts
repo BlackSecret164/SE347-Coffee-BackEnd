@@ -5,6 +5,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { AuthGuard } from '@nestjs/passport';
 import { RoleGuard } from 'src/guards/RoleGuard';
 import { Role } from 'src/guards/RoleDecorator';
+import { Public } from 'src/guards/PublicDecorator';
 import { EnumRoles } from 'src/enums/role.enum';
 
 @ApiTags('Product')
@@ -13,10 +14,8 @@ export class ProductController {
   constructor(private readonly productService: ProductService) { }
 
   @Get('/list')
-  @ApiOperation({ summary: 'Get list of products' })
-  @ApiBearerAuth()
-  @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Role([EnumRoles.ADMIN_SYSTEM, EnumRoles.ADMIN_BRAND, EnumRoles.STAFF, EnumRoles.CUSTOMER])
+  @Public()
+  @ApiOperation({ summary: 'Get list of products (public access)' })
   findAll(@Req() req: any) {
     const userRole = req.user?.role;
     const userBranchId = req.user?.branchId;
@@ -24,18 +23,21 @@ export class ProductController {
   }
 
   @Get('/filter')
+  @Public()
   @ApiOperation({ summary: 'Filter products by branch and/or category' })
   filterProducts(@Query() filterDto: FilterProductDto) {
     return this.productService.filterProducts(filterDto);
   }
 
   @Get('/available-branches/:productId')
+  @Public()
   @ApiOperation({ summary: 'Get available branches by product ID' })
   findBranches(@Param('productId', ParseIntPipe) productId: number) {
     return this.productService.findBranchesByProduct(productId);
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get product by ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productService.findOne(id);
