@@ -9,6 +9,7 @@ import { UpdateStatusDto } from '../dtos/product.dto';
 import { ProductMaterial } from '../entities/product-material.entity';
 import { ProductBranch } from 'src/entities/product_branch.entity';
 import { Branch } from 'src/entities/branches.entity';
+import { Rating } from 'src/entities/rating.entity';
 
 @Injectable()
 export class ProductService {
@@ -21,6 +22,9 @@ export class ProductService {
 
     @InjectRepository(ProductBranch)
     private readonly productBranchRepo: Repository<ProductBranch>,
+
+    @InjectRepository(Rating)
+    private readonly ratingRepo: Repository<Rating>,
 
     private readonly dataSource: DataSource,
   ) { }
@@ -107,35 +111,56 @@ export class ProductService {
     return this.mapProducts(products);
   }
 
-  private mapProducts(products: Product[]) {
-    return products.map((product) => ({
-      id: product.id.toString(),
-      name: product.name,
-      category: product.category,
-      description: product.description,
-      image: product.image,
-      available: product.available,
-      hot: product.hot,
-      cold: product.cold,
-      isPopular: product.isPopular,
-      isNew: product.isNew,
-      scope: product.scope,
-      sizes: product.sizes
-        .sort((a, b) => {
-          const order = { 'S': 1, 'M': 2, 'L': 3 };
-          return order[a.sizeName] - order[b.sizeName];
-        })
-        .map((s) => ({
-          sizeName: s.sizeName,
-          price: s.price,
-        })),
-      materials: product.productMaterials.map((pm) => ({
-        materialId: pm.materialId,
-        materialQuantity: pm.materialQuantity,
-        name: pm.rawMaterial.name,
-      })),
+  private async mapProducts(products: Product[]) {
+    // Fetch all ratings for these products in one query
+    const productIds = products.map(p => p.id);
+    const ratings = await this.ratingRepo
+      .createQueryBuilder('rating')
+      .select('rating.productId', 'productId')
+      .addSelect('AVG(rating.star)', 'avgRating')
+      .addSelect('COUNT(rating.id)', 'totalRatings')
+      .where('rating.productId IN (:...productIds)', { productIds })
+      .groupBy('rating.productId')
+      .getRawMany();
 
-    }));
+    // Create a map for quick lookup
+    const ratingMap = new Map(
+      ratings.map(r => [r.productId, { avg: parseFloat(r.avgRating) || 0, total: parseInt(r.totalRatings) || 0 }])
+    );
+
+    return products.map((product) => {
+      const productRating = ratingMap.get(product.id);
+      
+      return {
+        id: product.id.toString(),
+        name: product.name,
+        category: product.category,
+        description: product.description,
+        image: product.image,
+        available: product.available,
+        hot: product.hot,
+        cold: product.cold,
+        isPopular: product.isPopular,
+        isNew: product.isNew,
+        scope: product.scope,
+        rating: productRating ? Math.round(productRating.avg * 10) / 10 : undefined,
+        totalRatings: productRating?.total,
+        sizes: product.sizes
+          .sort((a, b) => {
+            const order = { 'S': 1, 'M': 2, 'L': 3 };
+            return order[a.sizeName] - order[b.sizeName];
+          })
+          .map((s) => ({
+            sizeName: s.sizeName,
+            price: s.price,
+          })),
+        materials: product.productMaterials.map((pm) => ({
+          materialId: pm.materialId,
+          materialQuantity: pm.materialQuantity,
+          name: pm.rawMaterial.name,
+        })),
+      };
+    });
   }
 
   async findOne(id: number) {
@@ -225,35 +250,8 @@ export class ProductService {
         );
       }
 
-      return availableProducts.map((pb) => {
-        const product = pb.product;
-        return {
-          id: product.id.toString(),
-          name: product.name,
-          category: product.category,
-          description: product.description,
-          image: product.image,
-          available: product.available,
-          hot: product.hot,
-          cold: product.cold,
-          isPopular: product.isPopular,
-          isNew: product.isNew,
-          sizes: product.sizes
-            .sort((a, b) => {
-              const order = { 'S': 1, 'M': 2, 'L': 3 };
-              return order[a.sizeName] - order[b.sizeName];
-            })
-            .map((s) => ({
-              sizeName: s.sizeName,
-              price: s.price,
-            })),
-          materials: product.productMaterials.map((pm) => ({
-            materialId: pm.materialId,
-            materialQuantity: pm.materialQuantity,
-            name: pm.rawMaterial.name,
-          })),
-        };
-      });
+      const products = availableProducts.map((pb) => pb.product);
+      return this.mapProducts(products);
     }
 
     // Nếu không có branchId nhưng có category, lọc theo category từ tất cả sản phẩm
@@ -272,32 +270,7 @@ export class ProductService {
         order: { id: 'ASC' },
       });
 
-      return products.map((product) => ({
-        id: product.id.toString(),
-        name: product.name,
-        category: product.category,
-        description: product.description,
-        image: product.image,
-        available: product.available,
-        hot: product.hot,
-        cold: product.cold,
-        isPopular: product.isPopular,
-        isNew: product.isNew,
-        sizes: product.sizes
-          .sort((a, b) => {
-            const order = { 'S': 1, 'M': 2, 'L': 3 };
-            return order[a.sizeName] - order[b.sizeName];
-          })
-          .map((s) => ({
-            sizeName: s.sizeName,
-            price: s.price,
-          })),
-        materials: product.productMaterials.map((pm) => ({
-          materialId: pm.materialId,
-          materialQuantity: pm.materialQuantity,
-          name: pm.rawMaterial.name,
-        })),
-      }));
+      return this.mapProducts(products);
     }
 
     // Nếu không có filter nào, trả về tất cả sản phẩm có sẵn
