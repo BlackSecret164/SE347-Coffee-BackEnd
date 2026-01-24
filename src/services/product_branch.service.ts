@@ -47,11 +47,16 @@ export class ProductBranchService {
       cold: record.product.cold,
       isPopular: record.product.isPopular,
       isNew: record.product.isNew,
+      scope: record.product.scope,
       sizes: record.product.sizes.map((s) => ({
         sizeName: s.sizeName,
         price: s.price,
       })),
       materials: record.product.productMaterials.map((pm) => ({
+        id: pm.materialId,
+        materialId: pm.materialId,
+        materialQuantity: pm.materialQuantity,
+        quantity: pm.materialQuantity,
         name: pm.rawMaterial.name,
       })),
       branch: {
@@ -92,11 +97,16 @@ export class ProductBranchService {
       cold: record.product.cold,
       isPopular: record.product.isPopular,
       isNew: record.product.isNew,
+      scope: record.product.scope,
       sizes: record.product.sizes.map((s) => ({
         sizeName: s.sizeName,
         price: s.price,
       })),
       materials: record.product.productMaterials.map((pm) => ({
+        id: pm.materialId,
+        materialId: pm.materialId,
+        materialQuantity: pm.materialQuantity,
+        quantity: pm.materialQuantity,
         name: pm.rawMaterial.name,
       })),
       branch: {
