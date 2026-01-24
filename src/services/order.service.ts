@@ -8,6 +8,7 @@ import {
 } from '../dtos/order.dto';
 import { OrderDetails } from '../entities/order-details.entity';
 import { Order } from '../entities/order_tb.entity';
+import { Customer } from '../entities/customer.entity';
 
 @Injectable()
 export class OrderService {
@@ -16,6 +17,8 @@ export class OrderService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderDetails)
     private readonly detailRepo: Repository<OrderDetails>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -102,10 +105,43 @@ export class OrderService {
   }
 
   async markComplete(id: number) {
+    // Lấy thông tin order trước khi cập nhật
+    const order = await this.orderRepo.findOne({ 
+      where: { id },
+      relations: ['customer']
+    });
+    
+    if (!order) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
+
+    // Cập nhật status order
     const result = await this.orderRepo.update(id, { status: 'Hoàn thành' });
     if (result.affected === 0)
       throw new NotFoundException(`Order ${id} not found`);
+
+    // Cập nhật customer total nếu đơn đã thanh toán
+    if (order.phoneCustomer && order.paymentStatus === 'Đã thanh toán') {
+      await this.updateCustomerTotal(order.phoneCustomer, order.totalPrice);
+    }
+
     return { message: 'Order marked as completed' };
+  }
+
+  /**
+   * Cộng dồn tổng chi tiêu vào customer.total
+   */
+  private async updateCustomerTotal(phone: string, amount: number) {
+    try {
+      const customer = await this.customerRepo.findOne({ where: { phone } });
+      if (customer) {
+        customer.total = (customer.total || 0) + amount;
+        await this.customerRepo.save(customer);
+      }
+    } catch (error) {
+      // Log lỗi nhưng không throw để không ảnh hưởng flow chính
+      console.error(`Error updating customer total for ${phone}:`, error.message);
+    }
   }
 
   async markCancel(id: number) {

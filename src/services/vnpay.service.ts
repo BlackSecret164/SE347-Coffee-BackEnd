@@ -5,6 +5,7 @@ import { ProductCode, VnpLocale } from 'vnpay';
 import { CreatePaymentUrlDto, PaymentResponseDto } from '../dtos/vnpay.dto';
 import { Order } from '../entities/order_tb.entity';
 import { VNPayTransaction } from '../entities/vnpay-transaction.entity';
+import { Customer } from '../entities/customer.entity';
 import { createVNPayInstance } from '../vnpay.config';
 
 @Injectable()
@@ -17,6 +18,8 @@ export class VnpayService {
     private readonly vnpayTransactionRepo: Repository<VNPayTransaction>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
   ) {}
 
   /**
@@ -121,6 +124,9 @@ export class VnpayService {
           paymentMethod: 'VNPay',
           status: 'Chờ xác nhận',
         });
+
+        // Cập nhật customer total sau khi thanh toán thành công
+        await this.updateCustomerTotalAfterPayment(Number(orderId), amount);
 
         return {
           isSuccess: true,
@@ -297,6 +303,44 @@ export class VnpayService {
         error.message,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Cập nhật customer total sau khi thanh toán thành công qua VNPay
+   */
+  private async updateCustomerTotalAfterPayment(
+    orderId: number,
+    amount: number,
+  ): Promise<void> {
+    try {
+      const order = await this.orderRepo.findOne({ 
+        where: { id: orderId },
+        relations: ['customer']
+      });
+
+      if (!order || !order.phoneCustomer) {
+        this.logger.warn(`[VNPay] Order ${orderId} has no customer info`);
+        return;
+      }
+
+      const customer = await this.customerRepo.findOne({ 
+        where: { phone: order.phoneCustomer } 
+      });
+
+      if (customer) {
+        customer.total = (customer.total || 0) + amount;
+        await this.customerRepo.save(customer);
+        this.logger.log(
+          `[VNPay] Updated customer ${order.phoneCustomer} total: +${amount}đ (new total: ${customer.total}đ)`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `[VNPay] Error updating customer total for order ${orderId}:`,
+        error.message,
+      );
+      // Không throw error để không ảnh hưởng flow thanh toán
     }
   }
 
